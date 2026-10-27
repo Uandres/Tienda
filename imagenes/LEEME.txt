@@ -1,0 +1,2 @@
+Guarda aquí las fotos de los productos (JPG cuadradas, nombres sin espacios ni tildes).
+Ejemplo: aretes-mariposa.jpg
