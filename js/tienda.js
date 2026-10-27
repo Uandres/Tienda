@@ -1,5 +1,6 @@
 /*
-  Lógica de la tienda: dibuja el catálogo a partir de js/productos.js,
+  Lógica de la tienda: lee los productos de la hoja de Google (o de js/productos.js
+  si la hoja no responde), dibuja el catálogo,
   maneja los filtros por categoría, la ventana de detalle y los botones
   de WhatsApp y pago. No necesitas editar este archivo para cambiar productos.
 */
@@ -9,6 +10,125 @@
   var CATEGORIAS = ["Aretes", "Pulseras", "Collares", "Anillos", "Tobilleras", "Otros"];
   var filtro = "Todos";
   var app = document.getElementById("app");
+  var productos = PRODUCTOS; // se reemplaza con los de la hoja de Google cuando carga
+  var cargando = false;
+
+  /* ---------- Lectura de la hoja de Google (CSV) ---------- */
+
+  // Convierte el texto CSV en filas y columnas (soporta comillas, comas y saltos de línea dentro de una celda)
+  function leerCSV(texto) {
+    texto = String(texto || "").replace(/^﻿/, "");
+    var filas = [], fila = [], celda = "", comillas = false;
+    for (var i = 0; i < texto.length; i++) {
+      var c = texto.charAt(i);
+      if (comillas) {
+        if (c === '"') {
+          if (texto.charAt(i + 1) === '"') { celda += '"'; i++; }
+          else comillas = false;
+        } else celda += c;
+      } else if (c === '"') comillas = true;
+      else if (c === ",") { fila.push(celda); celda = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && texto.charAt(i + 1) === "\n") i++;
+        fila.push(celda); filas.push(fila); fila = []; celda = "";
+      } else celda += c;
+    }
+    if (celda !== "" || fila.length) { fila.push(celda); filas.push(fila); }
+    return filas;
+  }
+
+  // "Categoría " -> "categoria", "Link de pago" -> "linkdepago"
+  function normalizar(s) {
+    return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+  }
+
+  // Nombres de columna que se aceptan para cada campo
+  var COLUMNAS = {
+    id: ["id", "codigo", "referencia", "ref"],
+    nombre: ["nombre", "producto", "titulo"],
+    categoria: ["categoria", "tipo"],
+    precio: ["precio", "valor", "precioCOP"],
+    descripcion: ["descripcion", "detalle", "detalles"],
+    imagen: ["imagen", "foto", "imagenes", "fotos"],
+    linkPago: ["linkpago", "linkdepago", "pago", "enlacedepago"],
+    vendido: ["vendido", "estado", "agotado"],
+    ejemplo: ["ejemplo"]
+  };
+
+  function slug(s) {
+    return normalizar(s).slice(0, 40) || "producto";
+  }
+
+  function esVendido(v) {
+    var n = normalizar(v);
+    return ["si", "s", "x", "true", "1", "vendido", "agotado"].indexOf(n) >= 0;
+  }
+
+  function rutaImagen(v) {
+    v = String(v || "").trim();
+    if (!v) return "";
+    if (/^https?:\/\//i.test(v)) return v;          // link completo
+    v = v.replace(/^\/+/, "");
+    return /^imagenes\//i.test(v) ? v : "imagenes/" + v;  // solo el nombre del archivo
+  }
+
+  function categoriaBonita(v) {
+    var n = normalizar(v);
+    if (!n) return "Otros";
+    for (var i = 0; i < CATEGORIAS.length; i++) if (normalizar(CATEGORIAS[i]) === n) return CATEGORIAS[i];
+    v = String(v).trim();
+    return v.charAt(0).toUpperCase() + v.slice(1);
+  }
+
+  function filasAProductos(filas) {
+    if (!filas.length) return [];
+    var encabezados = filas[0].map(normalizar);
+    var pos = {};
+    Object.keys(COLUMNAS).forEach(function (campo) {
+      var nombres = COLUMNAS[campo].map(normalizar);
+      pos[campo] = encabezados.findIndex(function (h) { return nombres.indexOf(h) >= 0; });
+    });
+    if (pos.nombre < 0) throw new Error("La hoja no tiene una columna 'nombre'.");
+    var vistos = {};
+    var lista = [];
+    filas.slice(1).forEach(function (f, i) {
+      function val(campo) { return pos[campo] >= 0 ? String(f[pos[campo]] || "").trim() : ""; }
+      var nombre = val("nombre");
+      if (!nombre) return; // fila vacía
+      var id = val("id") || slug(nombre);
+      if (vistos[id]) id = id + "-" + (i + 2);
+      vistos[id] = true;
+      lista.push({
+        id: id,
+        nombre: nombre,
+        categoria: categoriaBonita(val("categoria")),
+        precio: parseInt(val("precio").replace(/[^\d]/g, ""), 10) || 0,
+        descripcion: val("descripcion"),
+        imagen: rutaImagen(val("imagen")),
+        linkPago: val("linkPago"),
+        vendido: esVendido(val("vendido")),
+        ejemplo: esVendido(val("ejemplo"))
+      });
+    });
+    return lista;
+  }
+
+  function cargarHoja(url) {
+    var controlador = typeof AbortController === "function" ? new AbortController() : null;
+    var reloj = setTimeout(function () { if (controlador) controlador.abort(); }, 10000);
+    var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    return fetch(url + sep + "t=" + Date.now(), { signal: controlador ? controlador.signal : undefined })
+      .then(function (r) {
+        if (!r.ok) throw new Error("La hoja respondió " + r.status);
+        return r.text();
+      })
+      .then(function (texto) {
+        clearTimeout(reloj);
+        if (/^\s*</.test(texto)) throw new Error("El link no es de una hoja publicada como CSV.");
+        return filasAProductos(leerCSV(texto));
+      })
+      .catch(function (e) { clearTimeout(reloj); throw e; });
+  }
 
   // Convierte texto a HTML seguro (evita que un nombre con < o > rompa la página)
   function esc(s) {
@@ -80,15 +200,20 @@
   }
 
   function buscar(id) {
-    for (var i = 0; i < PRODUCTOS.length; i++) if (PRODUCTOS[i].id === id) return PRODUCTOS[i];
+    for (var i = 0; i < productos.length; i++) if (productos[i].id === id) return productos[i];
     return null;
   }
 
   function dibujar() {
     // Disponibles primero, vendidos al final
-    var lista = PRODUCTOS.slice().sort(function (a, b) { return (a.vendido ? 1 : 0) - (b.vendido ? 1 : 0); });
+    var lista = productos.slice().sort(function (a, b) { return (a.vendido ? 1 : 0) - (b.vendido ? 1 : 0); });
     var conteo = { Todos: lista.length };
-    lista.forEach(function (p) { conteo[p.categoria] = (conteo[p.categoria] || 0) + 1; });
+    var categorias = CATEGORIAS.slice();
+    lista.forEach(function (p) {
+      conteo[p.categoria] = (conteo[p.categoria] || 0) + 1;
+      if (categorias.indexOf(p.categoria) < 0) categorias.push(p.categoria); // categorías nuevas de la hoja
+    });
+    if (filtro !== "Todos" && !conteo[filtro]) filtro = "Todos";
     var visibles = lista.filter(function (p) { return filtro === "Todos" || p.categoria === filtro; });
     var wa = linkWhatsapp(null);
 
@@ -97,12 +222,18 @@
     h += '</div><div class="strand" role="presentation"></div></header>';
 
     h += '<main class="wrap"><nav class="filters" aria-label="Categorías">';
-    ["Todos"].concat(CATEGORIAS).forEach(function (c) {
-      if (c !== "Todos" && !conteo[c]) return;
-      h += '<button class="chip" type="button" data-act="filtro" data-v="' + c + '" aria-pressed="' + (filtro === c) + '">' + c + '<span class="n">' + conteo[c] + "</span></button>";
-    });
-    h += '</nav><section class="grid" aria-label="Productos">';
-    if (!visibles.length) h += '<p class="empty">Pronto habrá piezas nuevas en esta categoría.</p>';
+    if (!cargando) {
+      ["Todos"].concat(categorias).forEach(function (c) {
+        if (c !== "Todos" && !conteo[c]) return;
+        h += '<button class="chip" type="button" data-act="filtro" data-v="' + esc(c) + '" aria-pressed="' + (filtro === c) + '">' + esc(c) + '<span class="n">' + conteo[c] + "</span></button>";
+      });
+    }
+    h += '</nav><section class="grid" aria-label="Productos" aria-busy="' + cargando + '">';
+    if (cargando) {
+      for (var k = 0; k < 4; k++) h += '<div class="item"><div class="pic loading"></div><div class="cat">&nbsp;</div></div>';
+    } else if (!visibles.length) {
+      h += '<p class="empty">Pronto habrá piezas nuevas aquí.</p>';
+    }
     visibles.forEach(function (p) {
       h += '<article class="item' + (p.vendido ? " is-sold" : "") + '">';
       h += '<button class="pic" type="button" data-act="detalle" data-id="' + esc(p.id) + '" aria-label="Ver ' + esc(p.nombre) + '">' + foto(p) + "</button>";
@@ -148,5 +279,24 @@
     else if (a === "cerrar") { ventana.close(); }
   });
 
-  dibujar();
+  // Arranque: si hay hoja de Google, se leen los productos de ahí;
+  // si falla, se muestran los de respaldo de js/productos.js.
+  var url = String(TIENDA.hojaGoogle || "").trim();
+  if (url) {
+    cargando = true;
+    dibujar();
+    cargarHoja(url)
+      .then(function (lista) {
+        productos = lista;
+      })
+      .catch(function (e) {
+        console.warn("No se pudo leer la hoja de Google; se muestran los productos de respaldo.", e);
+      })
+      .then(function () {
+        cargando = false;
+        dibujar();
+      });
+  } else {
+    dibujar();
+  }
 })();

@@ -1,16 +1,19 @@
 /*
   =========================================================
-  DATOS DE LA TIENDA  —  este es el único archivo que
-  necesitas editar para cambiar productos, precios y fotos.
+  DATOS DE LA TIENDA
   =========================================================
 
-  Cómo agregar un producto:
-  1. Copia uno de los bloques { ... } de la lista PRODUCTOS.
-  2. Pégalo y cambia sus datos. Cada producto necesita un "id" distinto.
-  3. Guarda la foto en la carpeta "imagenes" y escribe su nombre en "imagen".
-  4. Separa cada bloque del siguiente con una coma.
+  Los PRODUCTOS se manejan desde tu hoja de Google Sheets
+  (el link está abajo en "hojaGoogle"). Ahí cambias precios,
+  nombres, descripciones y vendidos, sin tocar este archivo.
 
-  Campos de cada producto:
+  Aquí solo cambias el nombre de la tienda, la frase y el WhatsApp.
+
+  La lista PRODUCTOS de más abajo es un RESPALDO: la tienda la
+  muestra solo si la hoja de Google no responde, o si dejas
+  "hojaGoogle" vacío para manejar todo desde este archivo.
+
+  Campos de cada producto (los mismos que las columnas de la hoja):
   - id:          texto único, sin espacios (ej: "aretes-colibri")
   - nombre:      nombre que ve el cliente
   - categoria:   una de: Aretes, Pulseras, Collares, Anillos, Tobilleras, Otros
@@ -27,7 +30,10 @@ var TIENDA = {
   frase: "Aretes y pulseras hechos a mano, pieza por pieza.",
   // Tu celular de WhatsApp. 10 dígitos si es de Colombia (ej: "3001234567").
   // Si es de otro país, escribe el indicativo primero (ej: "5491122334455").
-  whatsapp: ""
+  whatsapp: "",
+  // Link de tu hoja de Google publicada como CSV
+  // (Archivo → Compartir → Publicar en la web → .csv). Vacío = usar la lista de abajo.
+  hojaGoogle: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrDDsMmcsJMPMgP5M0XzI2UUJjutjJlIwKT3k369PMJ-nrMFDN5b_4JLRxHcubgXZGHNf2eMWA1kba/pub?output=csv"
 };
 
 var PRODUCTOS = [

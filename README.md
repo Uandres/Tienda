@@ -12,11 +12,12 @@ La tienda usa solo los tres lenguajes básicos de la web. No usa frameworks (com
 |---|---|---|
 | `index.html` | **HTML** | La estructura de la página. Carga los estilos y los scripts. |
 | `css/estilos.css` | **CSS** | Colores, tipografías, tamaños y adaptación a celular. Tiene modo claro y oscuro automático. |
-| `js/productos.js` | **JavaScript** (solo datos) | **El archivo que vas a editar:** nombre de la tienda, WhatsApp y lista de productos. |
-| `js/tienda.js` | **JavaScript** | Dibuja el catálogo, los filtros por categoría, la ventana de detalle y los botones. |
+| `js/productos.js` | **JavaScript** (solo datos) | Nombre de la tienda, WhatsApp, link de la hoja de Google y productos de respaldo. |
+| `js/tienda.js` | **JavaScript** | Lee los productos de la hoja de Google, dibuja el catálogo, los filtros, la ventana de detalle y los botones. |
+| Hoja de Google Sheets | — | **Donde manejas los productos:** precios, nombres, descripciones, vendidos. |
 | `imagenes/` | — | Aquí guardas las fotos de tus productos. |
 
-Por eso se puede publicar gratis en GitHub Pages: es un **sitio estático**, o sea, archivos que el navegador lee tal cual.
+Por eso se puede publicar gratis en GitHub Pages: es un **sitio estático**, o sea, archivos que el navegador lee tal cual. Los productos vienen de una hoja de Google Sheets, que funciona como un administrador sencillo sin necesidad de base de datos.
 
 ---
 
@@ -40,41 +41,58 @@ Con Live Server, cada vez que guardas un archivo (`Ctrl+S`) la página se recarg
 
 ## 3. Cómo cambiar productos
 
-Todo se hace en **`js/productos.js`**.
+### Productos: desde tu hoja de Google Sheets
+Los productos se leen de tu hoja de Google, publicada como CSV. El link está en `js/productos.js`, en `hojaGoogle`. **Para el día a día solo editas la hoja**, desde el celular o el computador. Los cambios se ven en la tienda **unos 5 minutos después**, porque Google tarda un poco en actualizar la versión publicada.
 
-**Datos de la tienda:**
+Columnas de la hoja (la primera fila debe tener estos nombres; el orden no importa):
+
+| Columna | Qué va | Ejemplo |
+|---|---|---|
+| `nombre` | Nombre que ve el cliente. **Obligatoria.** Fila sin nombre = se ignora | Aretes mariposa |
+| `categoria` | Aretes, Pulseras, Collares, Anillos, Tobilleras u Otros. Si escribes una nueva (ej: Llaveros), aparece como filtro nuevo | Aretes |
+| `precio` | En pesos. Acepta `38000`, `38.000` o `$38.000` | 38000 |
+| `descripcion` | Materiales, medidas, cuidados. Puedes usar varias líneas (`Ctrl+Enter` dentro de la celda) | Mostacilla checa. Largo: 5 cm |
+| `imagen` | Nombre del archivo en la carpeta `imagenes` del repositorio, o un link completo `https://` | aretes-mariposa.jpg |
+| `linkPago` | Link de pago de Wompi, Mercado Pago, Bold… Vacío = sin botón de pago | https://checkout.wompi.co/l/XXXX |
+| `vendido` | `SI` si ya se vendió. Vacío o `NO` = disponible | NO |
+| `id` | Opcional. Código único del producto; si lo dejas vacío se crea a partir del nombre | aretes-mariposa |
+
+- **Agregar producto:** agrega una fila.
+- **Quitar producto:** borra la fila.
+- **Marcar vendido:** escribe `SI` en la columna `vendido`.
+- **Orden:** los productos salen en el orden de la hoja; los vendidos van al final.
+
+> No pongas en la hoja información privada (costos, proveedores, clientes): al estar publicada, cualquiera con el link puede verla.
+
+### Fotos: en la carpeta `imagenes` del repositorio
+Google Sheets no sirve para guardar fotos, y los links de Google Drive suelen fallar en páginas web. Por eso las fotos van en GitHub:
+1. En github.com/Uandres/Tienda entra a la carpeta `imagenes`.
+2. **Add file → Upload files**, arrastra la foto y da **Commit changes**.
+3. En la hoja, en la columna `imagen`, escribe solo el nombre del archivo: `aretes-mariposa.jpg`.
+
+Recomendaciones para las fotos:
+- Formato cuadrado (por ejemplo 1000 × 1000 px). La tienda las recorta en cuadrado.
+- JPG de menos de 300 KB cada una, para que la página cargue rápido en datos móviles. Puedes reducirlas gratis en [squoosh.app](https://squoosh.app).
+- Nombres sin espacios ni tildes: `aretes-mariposa.jpg`, no `Aretes Mariposa.JPG`. En internet, mayúsculas y minúsculas importan, y el nombre en la hoja debe ser idéntico al del archivo.
+
+### Nombre de la tienda y WhatsApp: en `js/productos.js`
+Casi nunca cambian, así que se quedan en el código. En GitHub abre `js/productos.js`, toca el lápiz ✏️, cambia esto y da **Commit changes**:
 ```js
 var TIENDA = {
   nombre: "Hilo y Chaquira",           // el nombre real de tu tienda
   frase: "Aretes y pulseras hechos a mano, pieza por pieza.",
-  whatsapp: "3001234567"               // tu celular, 10 dígitos
+  whatsapp: "3001234567",              // tu celular, 10 dígitos
+  hojaGoogle: "https://docs.google.com/…/pub?output=csv"
 };
 ```
 
-**Agregar un producto:** copia un bloque, pégalo dentro de `PRODUCTOS` y cambia los datos:
-```js
-{
-  id: "aretes-mariposa",               // único, sin espacios
-  nombre: "Aretes mariposa en mostacilla",
-  categoria: "Aretes",                 // Aretes, Pulseras, Collares, Anillos, Tobilleras u Otros
-  precio: 38000,                       // sin puntos ni $
-  descripcion: "Mostacilla checa, gancho de acero.\nLargo: 5 cm.",
-  imagen: "imagenes/aretes-mariposa.jpg",
-  linkPago: "https://checkout.wompi.co/l/XXXXXX",   // opcional
-  vendido: false
-},
-```
+### Productos de respaldo
+La lista `PRODUCTOS` de `js/productos.js` solo se muestra si la hoja de Google no responde, para que la tienda nunca quede vacía. Si un día quieres dejar de usar la hoja, borra el link de `hojaGoogle` (deja `""`) y la tienda usará esa lista.
 
-**Fotos:** guárdalas en la carpeta `imagenes`. Recomendaciones:
-- Formato cuadrado (por ejemplo 1000 × 1000 px). La tienda las recorta en cuadrado.
-- JPG de menos de 300 KB cada una, para que la página cargue rápido en datos móviles. Puedes reducirlas gratis en [squoosh.app](https://squoosh.app).
-- Nombres sin espacios ni tildes: `aretes-mariposa.jpg`, no `Aretes Mariposa.JPG`. En internet, mayúsculas y minúsculas importan.
-
-**Marcar como vendido:** cambia `vendido: false` por `vendido: true`.
-
-**Productos de ejemplo:** los 6 que trae la tienda tienen `ejemplo: true` y muestran la etiqueta "Ejemplo". Bórralos o reemplázalos antes de compartir la tienda.
-
-> **Cuidado con las comas.** Cada bloque `{ ... }` termina con `},`, y las comillas deben cerrarse. Si después de editar la página sale en blanco, casi siempre es una coma o una comilla faltante. Presiona `F12` en el navegador y mira la pestaña **Console**: ahí dice la línea del error.
+### Si algo no se ve bien
+- **Salen los productos de ejemplo en vez de los de la hoja:** la hoja no respondió. Revisa que siga publicada (Archivo → Compartir → Publicar en la web) y que el link en `hojaGoogle` termine en `output=csv`. Presiona `F12` en el navegador y mira la pestaña **Console**: ahí aparece el motivo.
+- **Un cambio no aparece:** espera unos 5 minutos y recarga la página.
+- **No aparece una foto:** revisa que el nombre en la hoja sea exactamente igual al del archivo en `imagenes`, incluidas mayúsculas y la extensión (`.jpg`, `.png`).
 
 ---
 
@@ -170,7 +188,7 @@ Tienda/
 ├── css/
 │   └── estilos.css     → diseño
 ├── js/
-│   ├── productos.js    → TUS DATOS: tienda y productos
+│   ├── productos.js    → nombre, WhatsApp, link de la hoja y productos de respaldo
 │   └── tienda.js       → lógica del catálogo
 ├── imagenes/           → fotos de los productos
 └── README.md           → esta guía
